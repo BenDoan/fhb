@@ -7,6 +7,7 @@ from flask.ext.login import LoginManager,login_user
 from flask_wtf import Form
 from wtforms import StringField
 from wtforms.validators import DataRequired
+from passlib.hash import pbkdf2_sha256
 
 app = Flask(__name__)
 loginmanager = LoginManager()
@@ -38,6 +39,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True)
     email = db.Column(db.String(120), unique=True)
+    password = db.Column(db.String)
     authenticated = db.Column(db.Boolean())
 
     def __init__(self, username, email):
@@ -74,15 +76,16 @@ def login():
         users = User.query.filter_by(username = request.form["name"])
         user = users.first()
         if user != None :
-            user.authenticated = True
-            db.session.commit()
-            login_user(user)
-            return redirect('/')
-    return render_template('login.html',form=form)
+            if pbkdf2_sha256.verify(request.form["password"],user.password) :
+                user.authenticated = True
+                db.session.commit()
+                login_user(user)
+    return redirect(request.form["redirect"])
 
 @app.route('/makeuser', methods=['GET'])
 def makeuser():
     admin = User('admin', 'admin@example.com')
+    admin.password = pbkdf2_sha256.encrypt("password")
     db.session.add(admin)
     db.session.commit()
     return "True"
@@ -94,7 +97,7 @@ def getuser():
 
 @app.route('/', methods=['GET','POST'])
 def hello():
-    return render_template('base.html')
+    return render_template('base.html',form=LoginForm())
 
 app.secret_key = "Secret"
 
