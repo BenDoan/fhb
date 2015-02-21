@@ -52,3 +52,6 @@ docs/_build/
 
 # PyBuilder
 target/
+
+static/*/gen
+static/.webassets-cache/
