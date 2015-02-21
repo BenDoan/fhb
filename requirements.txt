@@ -13,5 +13,6 @@ cssmin==0.2.0
 htmlmin==0.1.5
 itsdangerous==0.24
 jsmin==2.1.1
+passlib==1.6.2
 webassets==0.10.1
 wsgiref==0.1.2
