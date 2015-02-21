@@ -1,7 +1,9 @@
 {% if current_user.is_authenticated() %}
-<div>
-    HELLO {{ current_user.username }}
-</div>
+<p class="navbar-btn navbar-right">
+<a class="btn btn-default" href="logout?redirect={{ request.path }}">
+    Logout
+</a>
+</p>
 {% else %}
 <form class="navbar-form navbar-right" method="POST" action="/login">
     {{ form.csrf_token }}

@@ -3,7 +3,7 @@ from flask import *
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.assets import Environment, Bundle
 from htmlmin import minify
-from flask.ext.login import LoginManager,login_user
+from flask.ext.login import LoginManager,login_user,logout_user
 from flask_wtf import Form
 from wtforms import StringField, PasswordField
 from wtforms.validators import DataRequired
@@ -61,7 +61,6 @@ class User(db.Model):
         return False
 
     def get_id(self) :
-        print(self.email+"->")
         return self.email
 
 @loginmanager.user_loader
@@ -81,6 +80,11 @@ def login():
                 db.session.commit()
                 login_user(user)
     return redirect(request.form["redirect"])
+
+@app.route('/logout', methods=['GET'])
+def logout():
+    logout_user()
+    return redirect(request.args.get("redirect"))
 
 @app.route('/makeuser', methods=['GET'])
 def makeuser():
