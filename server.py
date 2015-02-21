@@ -3,7 +3,7 @@ from flask.ext.sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/test.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/fhb.db'
 
 app.config['DEBUG'] = True
 app.config['PROPAGATE_EXCEPTIONS'] = True
@@ -23,11 +23,17 @@ class User(db.Model):
     def __repr__(self):
         return '<User %r>' % self.username
 
-@app.route('/authenticate', methods=['POST'])
-def authenticate():
+@app.route('/makeuser', methods=['GET'])
+def makeuser():
     admin = User('admin', 'admin@example.com')
     db.session.add(admin)
     db.session.commit()
+    return ""
+
+@app.route('/getuser', methods=['GET'])
+def getuser():
+    admin = User.query.filter_by(username='admin').first()
+    return admin.username
 
 @app.route('/', methods=['GET'])
 def hello():
