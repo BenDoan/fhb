@@ -5,7 +5,7 @@ from flask.ext.assets import Environment, Bundle
 from htmlmin import minify
 from flask.ext.login import LoginManager,login_user
 from flask_wtf import Form
-from wtforms import StringField
+from wtforms import StringField, PasswordField
 from wtforms.validators import DataRequired
 from passlib.hash import pbkdf2_sha256
 
@@ -33,7 +33,7 @@ db = SQLAlchemy(app)
 
 class LoginForm(Form):
     name = StringField('name',validators=[DataRequired()])
-    password = StringField('password',validators=[DataRequired()])
+    password = PasswordField('password',validators=[DataRequired()])
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -97,7 +97,7 @@ def getuser():
 
 @app.route('/', methods=['GET','POST'])
 def hello():
-    return render_template('base.html',form=LoginForm())
+    return render_template('index.html',form=LoginForm())
 
 app.secret_key = "Secret"
 
