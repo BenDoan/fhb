@@ -3,8 +3,15 @@ from flask import *
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.assets import Environment, Bundle
 from htmlmin import minify
+from flask.ext.login import LoginManager,login_user
+from flask_wtf import Form
+from wtforms import StringField
+from wtforms.validators import DataRequired
 
 app = Flask(__name__)
+loginmanager = LoginManager()
+loginmanager.init_app(app)
+
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/fhb.db'
 
@@ -23,17 +30,55 @@ assets.register('js_all', js)
 
 db = SQLAlchemy(app)
 
+class LoginForm(Form):
+    name = StringField('name',validators=[DataRequired()])
+    password = StringField('password',validators=[DataRequired()])
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True)
     email = db.Column(db.String(120), unique=True)
+    authenticated = db.Column(db.Boolean())
 
     def __init__(self, username, email):
         self.username = username
         self.email = email
+        self.authenticated = False
 
     def __repr__(self):
         return '<User %r>' % self.username
+
+    def is_authenticated(self) :
+        print(self.email)
+        return self.authenticated
+
+    def is_active(self) :
+        return self.is_authenticated()
+
+    def is_anonymous(self) :
+        return False
+
+    def get_id(self) :
+        print(self.email+"->")
+        return self.email
+
+@loginmanager.user_loader
+def load_user(userid):
+    users =  User.query.filter_by(email=userid)
+    return users.first()
+
+@app.route('/login', methods=['GET','POST'])
+def login():
+    form = LoginForm()
+    if form.validate_on_submit():
+        users = User.query.filter_by(username = request.form["name"])
+        user = users.first()
+        if user != None :
+            user.authenticated = True
+            db.session.commit()
+            login_user(user)
+            return redirect('/')
+    return render_template('login.html',form=form)
 
 @app.route('/makeuser', methods=['GET'])
 def makeuser():
@@ -47,9 +92,11 @@ def getuser():
     admin = User.query.filter_by(username='admin').first()
     return admin.username
 
-@app.route('/', methods=['GET'])
+@app.route('/', methods=['GET','POST'])
 def hello():
     return render_template('base.html')
+
+app.secret_key = "Secret"
 
 if __name__ == "__main__":
     app.run(host="0.0.0")
