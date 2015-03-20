@@ -3,11 +3,13 @@ from flask import *
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.assets import Environment, Bundle
 from htmlmin import minify
-from flask.ext.login import LoginManager,login_user,logout_user
+from flask.ext.login import LoginManager,login_user,logout_user, current_user, login_required
 from flask_wtf import Form
 from wtforms import StringField, PasswordField
 from wtforms.validators import DataRequired
 from passlib.hash import pbkdf2_sha256
+
+from model import Model
 
 app = Flask(__name__)
 loginmanager = LoginManager()
@@ -29,50 +31,31 @@ assets.register('css_all', css)
 js = Bundle("js/vendor/jquery-1.11.2.min.js", "js/vendor/modernizr-2.8.3.min.js", 'js/bootstrap.js', 'js/main.js', filters="jsmin", output='js/gen/packed.js')
 assets.register('js_all', js)
 
-db = SQLAlchemy(app)
+model = Model(app)
+db = model.db
 
 class LoginForm(Form):
     name = StringField('name',validators=[DataRequired()])
     password = PasswordField('password',validators=[DataRequired()])
 
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True)
-    email = db.Column(db.String(120), unique=True)
-    password = db.Column(db.String)
-    authenticated = db.Column(db.Boolean())
-
-    def __init__(self, username, email):
-        self.username = username
-        self.email = email
-        self.authenticated = False
-
-    def __repr__(self):
-        return '<User %r>' % self.username
-
-    def is_authenticated(self) :
-        print(self.email)
-        return self.authenticated
-
-    def is_active(self) :
-        return self.is_authenticated()
-
-    def is_anonymous(self) :
-        return False
-
-    def get_id(self) :
-        return self.email
+def create_user(username,email,password):
+    newuser = model.User(username,email)
+    newuser.password = pbkdf2_sha256.encrypt(password)
+    db.session.add(newuser)
+    db.session.commit()
+    return newuser
 
 @loginmanager.user_loader
 def load_user(userid):
-    users =  User.query.filter_by(email=userid)
+    users =  model.User.query.filter_by(username=userid)
     return users.first()
 
-@app.route('/login', methods=['GET','POST'])
-def login():
+@app.route('/authenticate', methods=['GET','POST'])
+def authenticate():
+    print "Authenticating"
     form = LoginForm()
     if form.validate_on_submit():
-        users = User.query.filter_by(username = request.form["name"])
+        users = model.User.query.filter_by(username = request.form["name"])
         user = users.first()
         if user != None :
             if pbkdf2_sha256.verify(request.form["password"],user.password) :
@@ -81,6 +64,43 @@ def login():
                 login_user(user)
     return redirect(request.form["redirect"])
 
+@app.route('/signin', methods=['GET','POST'])
+def login():
+    form = LoginForm()
+    if request.method == 'GET' :
+        return render_template("signin.html",form = form,error = "")
+    error = "some fields were empty"
+    if form.validate_on_submit():
+        users = model.User.query.filter_by(username = request.form["name"])
+        user = users.first()
+        if user != None :
+            if pbkdf2_sha256.verify(request.form["password"],user.password) :
+                user.authenticated = True
+                db.session.commit()
+                login_user(user)
+                return redirect("/")
+        error = "incorrect username or password"
+    return render_template("signin.html",form = form,error = error);
+
+@app.route('/signup', methods=['GET','POST'])
+def signup():
+    form = SignupForm()
+    if request.method == 'GET' :
+        return render_template("signup.html",form = form,error="")
+    error = "some fields were empty"
+    if form.validate_on_submit():
+        error = "some fields were empty"
+        if request.form["password"] == request.form["repeatpassword"] :
+            user = create_user(request.form["name"],request.form["email"],request.form["password"])
+            user.authenticated = True
+            db.session.commit()
+            login_user(user)
+            return redirect("/")
+        else :
+            error = "passwords did not match"
+    return render_template("signup.html",form = form,error=error)
+
+@login_required
 @app.route('/logout', methods=['GET'])
 def logout():
     logout_user()
@@ -88,7 +108,7 @@ def logout():
 
 @app.route('/makeuser', methods=['GET'])
 def makeuser():
-    admin = User('admin', 'admin@example.com')
+    admin = model.User('admin', 'admin@example.com')
     admin.password = pbkdf2_sha256.encrypt("password")
     db.session.add(admin)
     db.session.commit()
@@ -96,12 +116,21 @@ def makeuser():
 
 @app.route('/getuser', methods=['GET'])
 def getuser():
-    admin = User.query.filter_by(username='admin').first()
+    admin = model.User.query.filter_by(username='admin').first()
     return admin.username
 
-@app.route('/', methods=['GET','POST'])
-def hello():
+@login_required
+@app.route('/', methods=['GET'])
+def index():
+    if current_user.is_anonymous():
+        return redirect("/signin")
     return render_template('index.html',form=LoginForm())
+
+@login_required
+@app.route('/js/<remainder>',methods=['GET'])
+@app.route('/img/<remainder>',methods=['GET'])
+def get_static(remainder):
+    return send_from_directory(app.static_folder,request.path[1:])
 
 app.secret_key = "Secret"
 
