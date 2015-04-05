@@ -132,6 +132,12 @@ def index():
 def get_static(remainder):
     return send_from_directory(app.static_folder,request.path[1:])
 
+@login_required
+@app.route('/signout')
+def signout():
+    logout_user()
+    return redirect('/signin')
+
 app.secret_key = "Secret"
 
 if __name__ == "__main__":
